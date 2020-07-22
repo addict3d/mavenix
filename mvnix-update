@@ -14,7 +14,11 @@ usage() {
                               speed up consecutive runs, but might affect
                               lock file if POM is changed in between.
     -n, --no-add             Don't add dependencies to nix store
-    -v, --verbose            Verbose output
+    -v, --verbose            Verbose output (everything)
+    --verbose-mvn            Verbose mvn output
+    --verbose-nix            Verbose nix output
+    --verbose-shell          Verbose shell output
+    --keep-failed            Don't delete tmp directory upon exit
     -h, --help               Print usage
 
   Version: $MAVENIX_VERSION
@@ -24,11 +28,12 @@ EOF
 
 # Setup work dir and cleanup
 WORK_DIR=$(mktemp -d --tmpdir mvnix-update.XXXXXX)
-cleanup() { { chmod -R +w "$WORK_DIR"; rm -rf "$WORK_DIR"; } || true; }
+cleanup() { { chmod -R +w "$WORK_DIR"; test "$do_rm" && rm -rf "$WORK_DIR"; } || true; }
 trap 'trap - EXIT; cleanup; kill -- $$' EXIT
 
 # Default values
 tmp_repo="$WORK_DIR/m2-repo"
+do_rm=1
 
 # Parse CLI arguments
 while test "$1";do
@@ -37,6 +42,10 @@ while test "$1";do
     -s|--save-repo) shift;tmp_repo="$1";;
     -n|--no-add) no_add=1;;
     -v|--verbose) verbose=1;set -x;;
+    --verbose-shell) set -x;;
+    --verbose-nix) verbose_nix=1;;
+    --verbose-mvn) verbose_mvn=1;;
+    --keep-failed) unset do_rm;;
     -h|--help) usage;;
     -*) usage "no option \"$1\"";;
     *) config="$1";;
@@ -46,7 +55,7 @@ done
 
 die() { echo >&2 "$@"; exit 1;}
 
-nix_flags=$(test "$verbose" && printf %s "--verbose" || true)
+nix_flags=$(test "$verbose" -o "$verbose_nix" && printf %s "--verbose" || true)
 
 if [[ "$expression" && "$config" ]]; then
   die "Expression and file arguments are mutually exclusive"
@@ -102,7 +111,7 @@ if test ! -w "$src_wd"; then
 fi
 
 # shellcheck disable=SC2015
-mvn_flags=$(test "$verbose" && printf %s "-e -X" || true)
+mvn_flags=$(test "$verbose" -o "$verbose_mvn" && printf %s "-e -X" || true)
 # shellcheck disable=SC2086
 mvn_() { ns_ "$src_wd" mvn $mvn_flags -B -nsu --settings "$settings" "$@"; }
 mvn_out() { ns_ "$src_wd" mvn -B -nsu --settings "$settings" "$@"; }
