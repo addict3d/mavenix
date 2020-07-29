@@ -28,7 +28,15 @@ EOF
 
 # Setup work dir and cleanup
 WORK_DIR=$(mktemp -d --tmpdir mvnix-update.XXXXXX)
-cleanup() { { chmod -R +w "$WORK_DIR"; test "$do_rm" && rm -rf "$WORK_DIR"; } || true; }
+cleanup() {
+chmod -R +w "$WORK_DIR"
+if [ "$do_rm" ]; then
+  rm -rf "$WORK_DIR"
+else
+  echo "Leaving tmp dir: $WORK_DIR"
+fi
+true
+}
 trap 'trap - EXIT; cleanup; kill -- $$' EXIT
 
 # Default values
